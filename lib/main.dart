@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:limit_kuota/src/features/monitoring/network_page.dart';
+import 'package:limit_kuota/src/features/home/home_screen.dart';
 
 void main() {
-  // Jalankan MyApp, bukan langsung Network
-  runApp(const MyApp()); 
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -11,9 +10,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false, // Opsional: hilangkan banner debug
-      home: Network(), // Network sekarang punya akses ke Directionality dari MaterialApp
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const HomeScreen(),
     );
   }
 }
