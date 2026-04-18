@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart'; // Import intl untuk format tanggal
-import 'package:limit_kuota/src/core/data/database_helper.dart'; // Import Database Helper
+import 'package:intl/intl.dart';
+import 'package:limit_kuota/src/core/data/database_helper.dart';
 import 'package:limit_kuota/src/core/services/intent_helper.dart';
-import 'package:limit_kuota/src/features/monitoring/history_page.dart'; // Import History Page
+import 'package:limit_kuota/src/features/monitoring/history_page.dart';
 
 class Network extends StatefulWidget {
   const Network({super.key});
@@ -18,32 +18,40 @@ class _NetworkState extends State<Network> {
   String wifiUsage = "0.00 MB";
   String mobileUsage = "0.00 MB";
 
+  // 🔥 TAMBAHAN BULANAN
+  String wifiMonth = "0.00 MB";
+  String mobileMonth = "0.00 MB";
+
   Future<void> fetchUsage() async {
     try {
-      // Sekarang result adalah Map
       final Map<dynamic, dynamic> result = await platform.invokeMethod(
         'getTodayUsage',
       );
 
-      // --- LOGIKA PENYIMPANAN KE SQLITE ---
-      // Ambil tanggal hari ini dalam format YYYY-MM-DD
       String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Ambil nilai integer (raw bytes) dari result
       int wifiBytes = result['wifi'] ?? 0;
       int mobileBytes = result['mobile'] ?? 0;
 
-      // Simpan ke database (akan update jika tanggal hari ini sudah ada)
       await DatabaseHelper.instance.insertOrUpdate(
         todayDate,
         wifiBytes,
         mobileBytes,
       );
-      // ------------------------------------
+
+      // 🔥 AMBIL DATA BULANAN
+      String currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
+
+      final monthlyData = await DatabaseHelper.instance
+          .getMonthlyUsage(currentMonth);
 
       setState(() {
         wifiUsage = _formatBytes(result['wifi']);
         mobileUsage = _formatBytes(result['mobile']);
+
+        // 🔥 UPDATE BULANAN
+        wifiMonth = _formatBytes(monthlyData["wifi"]!);
+        mobileMonth = _formatBytes(monthlyData["mobile"]!);
       });
     } on PlatformException catch (e) {
       if (e.code == "PERMISSION_DENIED") {
@@ -62,7 +70,6 @@ class _NetworkState extends State<Network> {
   }
 
   Future<void> checkLimitAndWarn(int currentUsage) async {
-    // 1024 MB dalam Bytes
     int limitInBytes = 1024 * 1024 * 1024;
 
     if (currentUsage >= limitInBytes) {
@@ -71,9 +78,8 @@ class _NetworkState extends State<Network> {
         builder: (context) => AlertDialog(
           title: const Text("Batas Kuota Tercapai!"),
           content: const Text(
-            "Penggunaan data Anda sudah mencapai mencapai limit. "
-            "Sistem Android tidak mengizinkan aplikasi mematikan internet secara otomatis. "
-            "Silakan aktifkan 'Set Data Limit' di pengaturan sistem agar koneksi terputus otomatis.",
+            "Penggunaan data Anda sudah mencapai limit. "
+            "Silakan aktifkan 'Set Data Limit' di pengaturan sistem.",
           ),
           actions: [
             TextButton(
@@ -105,7 +111,6 @@ class _NetworkState extends State<Network> {
       appBar: AppBar(
         title: const Text('Monitoring Data'),
         actions: [
-          // Tombol untuk menuju halaman History
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
@@ -124,6 +129,13 @@ class _NetworkState extends State<Network> {
             _usageCard("WiFi Today", wifiUsage, Icons.wifi),
             const SizedBox(height: 20),
             _usageCard("Mobile Today", mobileUsage, Icons.signal_cellular_alt),
+
+            // 🔥 TAMBAHAN BULANAN
+            const SizedBox(height: 30),
+            _usageCard("WiFi This Month", wifiMonth, Icons.calendar_month),
+            const SizedBox(height: 20),
+            _usageCard("Mobile This Month", mobileMonth, Icons.date_range),
+
             const SizedBox(height: 40),
             ElevatedButton.icon(
               onPressed: fetchUsage,
@@ -167,13 +179,12 @@ class _NetworkState extends State<Network> {
   void _showPermissionDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, // User harus menekan tombol
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Izin Diperlukan"),
           content: const Text(
-            "Aplikasi membutuhkan izin 'Akses Penggunaan' untuk membaca statistik data internet di perangkat Anda.\n\n"
-            "Silakan aktifkan izin untuk aplikasi ini di halaman pengaturan yang akan terbuka.",
+            "Aplikasi membutuhkan izin 'Akses Penggunaan' untuk membaca statistik data internet.",
           ),
           actions: [
             TextButton(
@@ -183,8 +194,6 @@ class _NetworkState extends State<Network> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Memanggil kembali fetchUsage akan memicu Kotlin
-                // untuk membuka halaman pengaturan lagi
                 fetchUsage();
               },
               child: const Text("Buka Pengaturan"),

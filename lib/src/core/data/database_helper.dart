@@ -21,7 +21,6 @@ class DatabaseHelper {
   }
 
   Future _createDB(Database db, int version) async {
-    // Kita buat tabel dengan kolom: date (Primary Key), wifi, mobile
     await db.execute('''
     CREATE TABLE history (
       date TEXT PRIMARY KEY, 
@@ -34,9 +33,6 @@ class DatabaseHelper {
   Future<void> insertOrUpdate(String date, int wifi, int mobile) async {
     final db = await instance.database;
 
-    // ConflictAlgorithm.replace akan menimpa data jika tanggal (Primary Key) sama.
-    // Ini berguna karena 'getTodayUsage' dari Kotlin selalu mengembalikan total
-    // akumulasi hari ini dari jam 00:00 sampai sekarang.
     await db.insert(
       'history',
       {'date': date, 'wifi': wifi, 'mobile': mobile},
@@ -46,7 +42,26 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getHistory() async {
     final db = await instance.database;
-    // Ambil data diurutkan dari tanggal terbaru
     return await db.query('history', orderBy: 'date DESC');
+  }
+
+  // ===============================
+  // 🔥 TAMBAHAN: REKAP BULANAN
+  // ===============================
+  Future<Map<String, int>> getMonthlyUsage(String month) async {
+    final db = await instance.database;
+
+    final result = await db.rawQuery('''
+      SELECT 
+        SUM(wifi) as totalWifi,
+        SUM(mobile) as totalMobile
+      FROM history
+      WHERE substr(date, 1, 7) = ?
+    ''', [month]);
+
+    return {
+      "wifi": (result[0]["totalWifi"] as int?) ?? 0,
+      "mobile": (result[0]["totalMobile"] as int?) ?? 0,
+    };
   }
 }
